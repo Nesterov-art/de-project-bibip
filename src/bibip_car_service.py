@@ -123,6 +123,7 @@ class CarService:
             sale.car_vin,
             sale.sales_date.isoformat(),
             str(sale.cost),
+            '0',
         ]
         
         row_no = self._append_row(self.sales_path, fields)
@@ -163,8 +164,9 @@ class CarService:
             sale_row = self._find_row(self.sales_index_path, vin)
             if sale_row is not None:
                 sale_fields = self._read_row(self.sales_path, sale_row)
-                sales_date = datetime.fromisoformat(sale_fields[2])
-                sales_cost = Decimal(sale_fields[3])
+                if sale_fields[4] == '0':          # продажа не отменена
+                    sales_date = datetime.fromisoformat(sale_fields[2])
+                    sales_cost = Decimal(sale_fields[3])
 
         return CarFullInfo(
             vin=car_fields[0],
@@ -197,8 +199,53 @@ class CarService:
 
     # Задание 6. Удаление продажи
     def revert_sale(self, sales_number: str) -> Car:
-        raise NotImplementedError
+        vin = sales_number.split('#')[1]
+
+        sale_row = self._find_row(self.sales_index_path, vin)
+        if sale_row is None:
+            raise ValueError(f'Продажа с номером {sales_number} не найдена')
+
+        sale_fields = self._read_row(self.sales_path, sale_row)
+        sale_fields[4] = '1'
+        self._write_row(self.sales_path, sale_row, sale_fields)
+
+        car_row = self._find_row(self.cars_index_path, vin)
+        car_fields = self._read_row(self.cars_path, car_row)
+        car_fields[4] = CarStatus.available.value
+        self._write_row(self.cars_path, car_row, car_fields)
+
+        return self._parse_car(car_fields)
 
     # Задание 7. Самые продаваемые модели
+        # Задание 7. Самые продаваемые модели
     def top_models_by_sales(self) -> list[ModelSaleStats]:
-        raise NotImplementedError
+        # Считаем продажи по моделям. В sales нет model_id — идём за ним в cars по VIN.
+        counts: dict[str, int] = {}
+        max_cost: dict[str, Decimal] = {}
+
+        for sale_fields in self._scan(self.sales_path):
+            if sale_fields[4] == '1':          # отменённые не считаем
+                continue
+            vin = sale_fields[1]
+            car_row = self._find_row(self.cars_index_path, vin)
+            if car_row is None:
+                continue
+            model_id = self._read_row(self.cars_path, car_row)[1]
+            cost = Decimal(sale_fields[3])
+
+            counts[model_id] = counts.get(model_id, 0) + 1
+            max_cost[model_id] = max(max_cost.get(model_id, cost), cost)
+
+        # Сортировка: сначала по числу продаж, при равенстве — по цене. Обе по убыванию.
+        top = sorted(counts, key=lambda mid: (counts[mid], max_cost[mid]), reverse=True)[:3]
+
+        result = []
+        for model_id in top:
+            model_row = self._find_row(self.models_index_path, model_id)
+            name, brand = self._read_row(self.models_path, model_row)[1:3]
+            result.append(ModelSaleStats(
+                car_model_name=name,
+                brand=brand,
+                sales_number=counts[model_id],
+            ))
+        return result
