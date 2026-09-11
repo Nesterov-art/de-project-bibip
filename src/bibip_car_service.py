@@ -179,7 +179,21 @@ class CarService:
 
     # Задание 5. Обновление ключевого поля
     def update_vin(self, vin: str, new_vin: str) -> Car:
-        raise NotImplementedError
+        row_no = self._find_row(self.cars_index_path, vin)
+        if row_no is None:
+            raise ValueError(f'Автомобиль с VIN {vin} не найден')
+
+        car_fields = self._read_row(self.cars_path, row_no)
+        car_fields[0] = new_vin
+        self._write_row(self.cars_path, row_no, car_fields)
+
+        index = self._read_index(self.cars_index_path)
+        index = [pair for pair in index if pair[0] != vin]
+        index.append([new_vin, str(row_no)])
+        index.sort()
+        self._write_index(self.cars_index_path, index)
+
+        return self._parse_car(car_fields)
 
     # Задание 6. Удаление продажи
     def revert_sale(self, sales_number: str) -> Car:
