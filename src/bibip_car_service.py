@@ -76,6 +76,14 @@ class CarService:
             status=CarStatus(fields[4]),
         )
 
+    def _scan(self, path: Path):
+        """Полный проход по файлу, по одной строке за раз (Seq Scan)."""
+        with open(path, 'r', newline='') as f:
+            while chunk := f.read(ROW_SIZE):
+                stripped = chunk.strip()
+                if stripped:
+                    yield stripped.split(SEP)
+    
     # Задание 1. Сохранение автомобилей и моделей
     def add_model(self, model: Model) -> Model:
         fields = [str(model.id), model.name, model.brand]
@@ -123,7 +131,7 @@ class CarService:
         index.append([sale.car_vin, str(row_no)])
         index.sort()
         self._write_index(self.sales_index_path, index)
-        
+
         car_row = self._find_row(self.cars_index_path, sale.car_vin)
         car_fields = self._read_row(self.cars_path, car_row)
         car_fields[4] = CarStatus.sold.value
@@ -133,7 +141,11 @@ class CarService:
 
     # Задание 3. Доступные к продаже
     def get_cars(self, status: CarStatus) -> list[Car]:
-        raise NotImplementedError
+        result = []
+        for fields in self._scan(self.cars_path):
+            if fields[4] == status.value:
+                result.append(self._parse_car(fields))
+        return result
 
     # Задание 4. Детальная информация
     def get_car_info(self, vin: str) -> CarFullInfo | None:
