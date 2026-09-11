@@ -37,7 +37,7 @@ class CarService:
         line = SEP.join(fields)
         if len(line) > LINE_LEN:
             raise ValueError(f'Строка длиннее {LINE_LEN} — смещения поедут')
-        row_no = path.stat().st_size // ROW_SIZE   # размер файла, не readlines()
+        row_no = path.stat().st_size // ROW_SIZE
         with open(path, 'a', newline='') as f:
             f.write(line.ljust(LINE_LEN) + '\n')
         return row_no
@@ -164,7 +164,7 @@ class CarService:
             sale_row = self._find_row(self.sales_index_path, vin)
             if sale_row is not None:
                 sale_fields = self._read_row(self.sales_path, sale_row)
-                if sale_fields[4] == '0':          # продажа не отменена
+                if sale_fields[4] == '0':
                     sales_date = datetime.fromisoformat(sale_fields[2])
                     sales_cost = Decimal(sale_fields[3])
 
@@ -196,7 +196,7 @@ class CarService:
         self._write_index(self.cars_index_path, index)
 
         return self._parse_car(car_fields)
-
+    
     # Задание 6. Удаление продажи
     def revert_sale(self, sales_number: str) -> Car:
         vin = sales_number.split('#')[1]
@@ -215,16 +215,14 @@ class CarService:
         self._write_row(self.cars_path, car_row, car_fields)
 
         return self._parse_car(car_fields)
-
+        
     # Задание 7. Самые продаваемые модели
-        # Задание 7. Самые продаваемые модели
     def top_models_by_sales(self) -> list[ModelSaleStats]:
-        # Считаем продажи по моделям. В sales нет model_id — идём за ним в cars по VIN.
         counts: dict[str, int] = {}
         max_cost: dict[str, Decimal] = {}
 
         for sale_fields in self._scan(self.sales_path):
-            if sale_fields[4] == '1':          # отменённые не считаем
+            if sale_fields[4] == '1':          
                 continue
             vin = sale_fields[1]
             car_row = self._find_row(self.cars_index_path, vin)
@@ -236,7 +234,6 @@ class CarService:
             counts[model_id] = counts.get(model_id, 0) + 1
             max_cost[model_id] = max(max_cost.get(model_id, cost), cost)
 
-        # Сортировка: сначала по числу продаж, при равенстве — по цене. Обе по убыванию.
         top = sorted(counts, key=lambda mid: (counts[mid], max_cost[mid]), reverse=True)[:3]
 
         result = []
