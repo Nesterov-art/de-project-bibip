@@ -149,7 +149,33 @@ class CarService:
 
     # Задание 4. Детальная информация
     def get_car_info(self, vin: str) -> CarFullInfo | None:
-        raise NotImplementedError
+        car_row = self._find_row(self.cars_index_path, vin)
+        if car_row is None:
+            return None
+        car_fields = self._read_row(self.cars_path, car_row)
+
+        model_row = self._find_row(self.models_index_path, car_fields[1])
+        model_fields = self._read_row(self.models_path, model_row)
+
+        sales_date = None
+        sales_cost = None
+        if car_fields[4] == CarStatus.sold.value:
+            sale_row = self._find_row(self.sales_index_path, vin)
+            if sale_row is not None:
+                sale_fields = self._read_row(self.sales_path, sale_row)
+                sales_date = datetime.fromisoformat(sale_fields[2])
+                sales_cost = Decimal(sale_fields[3])
+
+        return CarFullInfo(
+            vin=car_fields[0],
+            car_model_name=model_fields[1],
+            car_model_brand=model_fields[2],
+            price=Decimal(car_fields[2]),
+            date_start=datetime.fromisoformat(car_fields[3]),
+            status=CarStatus(car_fields[4]),
+            sales_date=sales_date,
+            sales_cost=sales_cost,
+        )
 
     # Задание 5. Обновление ключевого поля
     def update_vin(self, vin: str, new_vin: str) -> Car:
